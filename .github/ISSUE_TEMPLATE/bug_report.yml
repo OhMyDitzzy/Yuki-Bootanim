@@ -1,0 +1,108 @@
+name: 🐛 Bug Report
+description: Report problems while installing or using this module
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before reporting, please check the **Troubleshooting** section in the README — some common issues (boot animation not changing, failed remount) are explained there.
+
+  - type: input
+    id: module-version
+    attributes:
+      label: Module version
+      description: Look in module.prop or the module page in your manager.
+      placeholder: "v1.0.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: root-manager
+    attributes:
+      label: Root manager
+      options:
+        - Magisk
+        - KernelSU
+        - KernelSU Next
+        - APatch
+    validations:
+      required: true
+
+  - type: input
+    id: root-manager-version
+    attributes:
+      label: Root manager version
+      placeholder: "example: Magisk v27.0"
+    validations:
+      required: true
+
+  - type: input
+    id: metamodule
+    attributes:
+      label: OverlayFS Metamodule used (if any)
+      description: example magic_overlayfs, Hybrid-Mount, Mountify — leave blank if not used / dont know
+      placeholder: "magic_overlayfs v..."
+
+  - type: input
+    id: android-version
+    attributes:
+      label: Android version & device
+      placeholder: "example: Android 13, Samsung Galaxy S21"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: format
+    attributes:
+      label: Boot animation format used
+      options:
+        - "bootanimation.zip (standard)"
+        - "bootsamsung.qmg / bootsamsungloop.qmg (Samsung One UI)"
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Which are expected
+      description: What should happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: That happened
+      description: What actually happened? Include any error messages if any.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      placeholder: |
+        1. Install module...
+        2. Open WebUI, select file...
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log / screenshot
+      description: Log from module page (description section that displays installation path), or error screenshot in WebUI
+      render: shell
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Confirmation
+      options:
+        - label: Ive checked the Troubleshooting section in the README and this issue isnt covered.
+          required: true
+        - label: I have rebooted after installing/updating this module
+          required: true

@@ -1,0 +1,55 @@
+name: Build & Release Module
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get version from tag
+        id: version
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG#v}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Validate module.prop matches tag
+        run: |
+          PROP_VERSION=$(grep -E '^version=' module.prop | cut -d'=' -f2)
+          TAG="${{ steps.version.outputs.tag }}"
+          if [ "$PROP_VERSION" != "$TAG" ]; then
+            echo "::warning::version di module.prop ($PROP_VERSION) beda dengan tag ($TAG). Release tetap lanjut, tapi sebaiknya disamakan."
+          fi
+
+      - name: Package module into flashable zip
+        run: |
+          ZIP_NAME="Yuki-Bootanim-${{ steps.version.outputs.tag }}.zip"
+          mkdir -p dist
+          zip -r "dist/$ZIP_NAME" . \
+            -x ".git/*" \
+            -x ".github/*" \
+            -x ".gitignore" \
+            -x "dist/*" \
+            -x "*.zip"
+          echo "zip_name=$ZIP_NAME" >> "$GITHUB_ENV"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Yuki Boot Animation ${{ steps.version.outputs.tag }}
+          draft: false
+          prerelease: ${{ contains(steps.version.outputs.tag, '-') }}
+          generate_release_notes: true
+          files: dist/${{ env.zip_name }}

@@ -1,0 +1,7 @@
+id=yuki_bootanim_installer
+name=Yuki Boot Animation
+version=v1.0.0
+versionCode=1
+author=Ditzzy
+description=Install custom boot animations (.zip / Samsung .qmg) via WebUI. Supports KernelSU, KernelSU Next, APatch, and Magisk. Automatically selects remount method (Android 9-) or overlay via metamodule (Android 10+).
+banner=webroot/assets/wp.png

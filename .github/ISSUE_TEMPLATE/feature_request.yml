@@ -1,0 +1,44 @@
+name: ✨ Feature Request
+description: Propose new features or improvements for this module
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem do you want to solve?
+      description: Describe the context or constraints you are currently experiencing.
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: What kind of features or changes do you envision?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: root-manager
+    attributes:
+      label: Which root manager is relevant for?
+      multiple: true
+      options:
+        - Magisk
+        - KernelSU
+        - KernelSU Next
+        - APatch
+        - All
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Other alternatives that have been tried
+      description: Optional — other methods you have tried before requesting this feature
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: Screenshots, references to other modules, or other relevant information
