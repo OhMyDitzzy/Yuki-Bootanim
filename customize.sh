@@ -81,8 +81,10 @@ METAMODULE_NAME=$METAMODULE_NAME
 SYSTEM_MEDIA=/system/media
 # Space-separated, most-likely-first. Different ROMs keep their boot
 # animation under different partitions depending on partition layout
-# (system-as-root, split /product, A/B, etc).
-ROM_MEDIA_CANDIDATES="/product/media /system/media /system/product/media"
+# (system-as-root, split /product, A/B, etc). Kept identical to apply.sh's
+# own inline fallback default so behavior doesn't depend on whether
+# device.conf happens to be readable.
+ROM_MEDIA_CANDIDATES="/product/media /product/etc/media /oem/media /system/media /system/product/media"
 EOF
 
 chmod 0644 "$CONF" 2>/dev/null

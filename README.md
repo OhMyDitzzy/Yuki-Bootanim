@@ -23,9 +23,13 @@ device, and applying it.
   `/system` first; if that fails (e.g. dm-verity/AVB is still active), it
   falls back to installing through the module's own overlay path using **OverlayFS**.
 - **Multi-ROM path detection** — not every ROM keeps its boot animation at
-  `/system/media`. The module checks `/product/media`,
-  `/system/media`, and `/system/product/media`, and prefers whichever one
-  your device already boots from.
+  `/system/media`. The module checks `/product/media`, `/product/etc/media`,
+  `/oem/media`, `/system/media`, and `/system/product/media`, and prefers
+  whichever one already has a boot animation file on it — that's the
+  clearest sign the running ROM actually reads from there. If none of them
+  do, the result is flagged as an unconfirmed path in the install log and
+  in the module's description, since a ROM using a path outside this list
+  won't be detected.
 - **Automatic backup & restore** — the file it's about to replace is backed
   up before anything is written, and restored automatically if you uninstall
   the module.

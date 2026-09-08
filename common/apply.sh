@@ -196,7 +196,10 @@ if [ "$EXT" = "zip" ]; then
   fi
 fi
 
-ROM_MEDIA_CANDIDATES="${ROM_MEDIA_CANDIDATES:-/product/media /product/etc/media /system/media /system/product/media}"
+# /oem/media is a current, first-class AOSP boot-animation search path
+# (frameworks/base cmds/bootanimation/BootAnimation.cpp, findBootAnimationFile())
+# that was missing from this list entirely.
+ROM_MEDIA_CANDIDATES="${ROM_MEDIA_CANDIDATES:-/product/media /product/etc/media /oem/media /system/media /system/product/media}"
 
 candidate_has_existing_bootanim() {
   # True if this candidate directory already ships a boot animation file —
@@ -207,9 +210,14 @@ candidate_has_existing_bootanim() {
   return 1
 }
 
+# Sets RESOLVED_SYSTEM_MEDIA and MEDIA_MATCH_TYPE as a side effect. Called
+# directly (not via $()) — command substitution runs in a subshell on every
+# /system/bin/sh Android ships (mksh, toybox sh, busybox ash), so a second
+# output variable set inside $() would not survive outside of it.
 resolve_system_media() {
   _chosen=""
   _first_existing_dir=""
+  MEDIA_MATCH_TYPE="hardcoded_fallback"
 
   for _cand in $ROM_MEDIA_CANDIDATES; do
     if [ -d "$_cand" ]; then
@@ -217,6 +225,7 @@ resolve_system_media() {
       if candidate_has_existing_bootanim "$_cand"; then
         log "Candidate $_cand already has an existing boot animation file — using it."
         _chosen="$_cand"
+        MEDIA_MATCH_TYPE="existing_bootanim"
         break
       fi
     fi
@@ -225,17 +234,20 @@ resolve_system_media() {
   if [ -z "$_chosen" ] && [ -n "$_first_existing_dir" ]; then
     log "No candidate has an existing boot animation file; falling back to first existing directory: $_first_existing_dir"
     _chosen="$_first_existing_dir"
+    MEDIA_MATCH_TYPE="existing_dir_fallback"
   fi
   
   if [ -z "$_chosen" ]; then
     _chosen="${SYSTEM_MEDIA:-/system/media}"
     log "None of the ROM_MEDIA_CANDIDATES exist as directories yet; falling back to $_chosen"
+    MEDIA_MATCH_TYPE="hardcoded_fallback"
   fi
 
-  printf '%s' "$_chosen"
+  RESOLVED_SYSTEM_MEDIA="$_chosen"
 }
 
-SYSTEM_MEDIA=$(resolve_system_media)
+resolve_system_media
+SYSTEM_MEDIA="$RESOLVED_SYSTEM_MEDIA"
 REMOUNTED_BY_US=false
 USE_OVERLAY=false
 
@@ -375,10 +387,28 @@ rm -f "$SRC" 2>/dev/null
 # on-device path and doubles as the fallback here.
 DISPLAY_MEDIA_PATH="${DEVICE_MEDIA_PATH:-$SYSTEM_MEDIA}"
 
+case "$MEDIA_MATCH_TYPE" in
+  existing_bootanim)
+    PATH_CONFIRMED=true
+    MATCH_WARNING=""
+    CONFIDENCE_TAG=""
+    ;;
+  existing_dir_fallback)
+    PATH_CONFIRMED=false
+    MATCH_WARNING=" WARNING: no existing boot animation was found under ${DISPLAY_MEDIA_PATH} before this install, so this path is a guess, not a confirmed match. If the animation doesn't change after reboot, this ROM likely reads its boot animation from a path this module doesn't know about yet."
+    CONFIDENCE_TAG=", unconfirmed path"
+    ;;
+  *)
+    PATH_CONFIRMED=false
+    MATCH_WARNING=" WARNING: none of this module's known candidate paths exist yet on this device, so ${DISPLAY_MEDIA_PATH} is a hardcoded guess. If the animation doesn't change after reboot, this ROM likely stores its boot animation somewhere this module doesn't know about."
+    CONFIDENCE_TAG=", unconfirmed path"
+    ;;
+esac
+
 if [ "$USE_OVERLAY" = "true" ]; then
-  DESC_DETAIL="${DISPLAY_MEDIA_PATH} (Overlay)"
-  emit true "done" "The file is stored as $(basename "$RESULT_PATH") via the overlay module path. This only becomes active after REBOOT — direct remounting to /system is not available on this device." "\"installed_as\":\"$(basename "$RESULT_PATH")\",\"reboot_required\":true,\"via_overlay\":true"
+  DESC_DETAIL="${DISPLAY_MEDIA_PATH} (Overlay${CONFIDENCE_TAG})"
+  emit true "done" "The file is stored as $(basename "$RESULT_PATH") via the overlay module path. This only becomes active after REBOOT — direct remounting to /system is not available on this device.${MATCH_WARNING}" "\"installed_as\":\"$(basename "$RESULT_PATH")\",\"reboot_required\":true,\"via_overlay\":true,\"media_match_type\":\"$MEDIA_MATCH_TYPE\",\"path_confirmed\":$PATH_CONFIRMED"
 else
-  DESC_DETAIL="${DISPLAY_MEDIA_PATH} (Direct-write)"
-  emit true "done" "Successfully installed as $(basename "$RESULT_PATH"). Reboot to see the new boot animation." "\"installed_as\":\"$(basename "$RESULT_PATH")\",\"reboot_required\":true,\"via_overlay\":false"
+  DESC_DETAIL="${DISPLAY_MEDIA_PATH} (Direct-write${CONFIDENCE_TAG})"
+  emit true "done" "Successfully installed as $(basename "$RESULT_PATH"). Reboot to see the new boot animation.${MATCH_WARNING}" "\"installed_as\":\"$(basename "$RESULT_PATH")\",\"reboot_required\":true,\"via_overlay\":false,\"media_match_type\":\"$MEDIA_MATCH_TYPE\",\"path_confirmed\":$PATH_CONFIRMED"
 fi
