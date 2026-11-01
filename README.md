@@ -20,8 +20,9 @@ device, and applying it.
 - **Automatic language detection** — the WebUI follows the device language,
   with Russian and English translations (English is used for other languages).
   Translation dictionaries live in `webroot/locales/` and load locally before
-  the WebUI script. Status text written to the module manager is localized
-  separately using the Android system language.
+  the WebUI script. The installer output and module manager description are
+  also localized during module installation and updated with the install
+  status afterward.
 - **Two boot animation formats** — standard `bootanimation.zip` for most
   devices, and Samsung's `.qmg` format (`bootsamsung.qmg` /
   `bootsamsungloop.qmg`) for One UI devices. The module detects which one
