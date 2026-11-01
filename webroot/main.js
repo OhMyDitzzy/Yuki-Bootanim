@@ -16,6 +16,34 @@
   // string-length limits while keeping the chunk count reasonable.
   var CHUNK_SIZE = 48 * 1024;
 
+  var language = ((navigator.languages && navigator.languages[0]) || navigator.language || "en")
+    .toLowerCase()
+    .split("-")[0];
+  if (language !== "ru") language = "en";
+
+  var messages = window.YukiBootanimLocales;
+  if (!messages || !messages.en || !messages.ru) {
+    throw new Error("WebUI locale files failed to load.");
+  }
+
+  function t(key, params) {
+    var value = messages[language][key] || messages.en[key] || key;
+    return value.replace(/\{(\w+)\}/g, function (match, name) {
+      return params && params[name] !== undefined ? params[name] : match;
+    });
+  }
+
+  function applyTranslations() {
+    document.documentElement.lang = language;
+    document.title = t("pageTitle");
+    Array.prototype.forEach.call(document.querySelectorAll("[data-i18n]"), function (el) {
+      el.textContent = t(el.getAttribute("data-i18n"));
+    });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-i18n-aria-label]"), function (el) {
+      el.setAttribute("aria-label", t(el.getAttribute("data-i18n-aria-label")));
+    });
+  }
+
   var els = {};
 
   function cacheEls() {
@@ -71,7 +99,7 @@
   function ksuExecRaw(cmd) {
     return new Promise(function (resolve, reject) {
       if (!hasExecBridge()) {
-        reject(new Error("No root shell bridge (window.ksu.exec) is available in this WebView."));
+        reject(new Error(t("noRootBridge")));
         return;
       }
       var cbName = uniqueCallbackName();
@@ -107,9 +135,9 @@
       // is common enough (impatient users opening WebUI right after
       // flashing) to deserve a specific message instead of a raw shell error.
       if (/apply\.sh.*(not found|no such file)/i.test(stderr) || (cmd.indexOf(MODDIR_APPLY) !== -1 && /not found|no such file/i.test(stderr))) {
-        throw new Error("apply.sh not found yet \u2014 reboot once after installing or updating this module, then reopen this page.");
+        throw new Error(t("missingApplyScript"));
       }
-      throw new Error(stderr || "Command failed with no output.");
+      throw new Error(stderr || t("commandFailed"));
     }
     return stdout.trim();
   }
@@ -123,7 +151,7 @@
     ksu: "KernelSU / KernelSU Next",
     apatch: "APatch",
     magisk: "Magisk",
-    unknown: "Not recognized",
+    unknown: "notRecognized",
   };
 
   function parseConf(text) {
@@ -158,7 +186,7 @@
     }
 
     if (!text) {
-      els.deviceLine.textContent = "Device detection has not run yet — reboot after installing the module.";
+      els.deviceLine.textContent = t("deviceNotDetected");
       els.kvManager.textContent = "\u2014";
       els.kvApi.textContent = "\u2014";
       els.kvFormat.textContent = "\u2014";
@@ -166,7 +194,7 @@
       // Nothing usable in device.conf: keep the apply button disabled with
       // a clear reason rather than letting the user hit an opaque failure
       // later inside apply.sh.
-      setApplyDisabledReason("Device info unavailable \u2014 reboot first");
+      setApplyDisabledReason("deviceInfoUnavailable");
       return null;
     }
 
@@ -175,25 +203,25 @@
     var hasMeta = conf.HAS_METAMODULE === "true";
 
     els.deviceLine.textContent = isSamsung
-      ? "Samsung device \u2014 One UI (.qmg format)"
-      : "Standard boot animation format (.zip)";
+      ? t("samsungFormat")
+      : t("standardFormat");
 
-    els.kvManager.textContent = ROOT_MGR_LABELS[conf.ROOT_MGR] || conf.ROOT_MGR || "\u2014";
+    els.kvManager.textContent =
+      ROOT_MGR_LABELS[conf.ROOT_MGR] ? t(ROOT_MGR_LABELS[conf.ROOT_MGR]) : conf.ROOT_MGR || "\u2014";
     els.kvApi.textContent = conf.API ? "API " + conf.API : "\u2014";
-    els.kvFormat.textContent = isSamsung ? ".qmg (Samsung)" : ".zip (standard)";
+    els.kvFormat.textContent = isSamsung ? t("samsungQmg") : t("standardZip");
 
     var candidates = (conf.ROM_MEDIA_CANDIDATES || conf.SYSTEM_MEDIA || "/system/media")
       .split(/\s+/)
       .filter(Boolean);
     els.kvMount.textContent = candidates.length > 1 ? candidates[0] + " (+" + (candidates.length - 1) + ")" : candidates[0];
     if (candidates.length > 1) {
-      els.kvMount.title = "Candidate paths, in order of preference: " + candidates.join(", ");
+      els.kvMount.title = t("candidatePaths", { paths: candidates.join(", ") });
     }
 
     if (conf.ROOT_MGR === "ksu" && !hasMeta) {
       els.metamoduleWarning.hidden = false;
-      els.metamoduleWarningText.textContent =
-        "If direct remount to /system fails on this device, a metamodule (Hybrid-Mount or Mountify) will be required to install via the overlay path.";
+      els.metamoduleWarningText.textContent = t("metamoduleWarning");
     } else {
       els.metamoduleWarning.hidden = true;
     }
@@ -223,21 +251,21 @@
   }
 
   var selectedFile = null;
-  var applyDisabledReason = "Select the file first";
+  var applyDisabledReason = "selectFileFirst";
 
-  function setApplyDisabledReason(text) {
-    applyDisabledReason = text;
+  function setApplyDisabledReason(key) {
+    applyDisabledReason = key;
     refreshApplyButton();
   }
 
   function refreshApplyButton() {
     if (selectedFile) {
       els.applyBtn.disabled = false;
-      els.applyBtnText.textContent = "Install boot animation";
+      els.applyBtnText.textContent = t("installAnimation");
       els.applyBtn.classList.remove("is-danger");
     } else {
       els.applyBtn.disabled = true;
-      els.applyBtnText.textContent = applyDisabledReason;
+      els.applyBtnText.textContent = t(applyDisabledReason);
     }
   }
 
@@ -267,7 +295,7 @@
     els.fileInput.value = "";
     els.fileBar.hidden = true;
     showValidationError(null);
-    setApplyDisabledReason("Select the file first");
+    setApplyDisabledReason("selectFileFirst");
   }
 
   function onFilePicked(file) {
@@ -277,15 +305,15 @@
     if (ext !== "zip" && ext !== "qmg") {
       selectedFile = null;
       els.fileBar.hidden = true;
-      showValidationError("The ." + (ext || "?") + " extension is not supported. Pick a .zip or .qmg file.");
-      setApplyDisabledReason("Select the file first");
+      showValidationError(t("unsupportedExtension", { ext: ext || "?" }));
+      setApplyDisabledReason("selectFileFirst");
       return;
     }
     if (file.size === 0) {
       selectedFile = null;
       els.fileBar.hidden = true;
-      showValidationError("The selected file is empty (0 bytes).");
-      setApplyDisabledReason("Select the file first");
+      showValidationError(t("emptyFile"));
+      setApplyDisabledReason("selectFileFirst");
       return;
     }
 
@@ -318,7 +346,7 @@
         resolve(comma === -1 ? result : result.slice(comma + 1));
       };
       reader.onerror = function () {
-        reject(new Error("Failed to read the file from disk."));
+        reject(new Error(t("failedReadFile")));
       };
       reader.readAsDataURL(file);
     });
@@ -338,7 +366,7 @@
     var uploadId = makeUploadId();
     var total = Math.ceil(base64Data.length / CHUNK_SIZE);
 
-    logLine("Starting transfer: " + total + " chunk(s), " + formatSize(base64Data.length) + " of base64 data.");
+    logLine(t("startingTransfer", { total: total, size: formatSize(base64Data.length) }));
 
     for (var i = 0; i < total; i++) {
       var piece = base64Data.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
@@ -355,12 +383,12 @@
       try {
         out = await shExec(cmd);
       } catch (err) {
-        throw new Error("Transfer failed at chunk " + i + "/" + total + ": " + err.message);
+        throw new Error(t("transferFailed", { index: i, total: total, message: err.message }));
       }
 
       var parsed = safeParseJson(out);
       if (!parsed || parsed.ok !== true) {
-        var msg = (parsed && parsed.message) || "Unknown error sending chunk " + i + ".";
+        var msg = (parsed && localizeServerMessage(parsed.message)) || t("unknownChunkError", { index: i });
         // Best-effort cleanup of the partial upload on the shell side —
         // failure here shouldn't mask the original error.
         try {
@@ -372,11 +400,11 @@
       }
 
       if (total > 1) {
-        logLine("Sent chunk " + (i + 1) + "/" + total + ".");
+        logLine(t("sentChunk", { index: i + 1, total: total }));
       }
     }
 
-    logLine("All chunks sent. Assembling and installing on-device\u2026");
+    logLine(t("assembling"));
 
     var finishCmd =
       shQuote(MODDIR_APPLY) + " finish " + shQuote(uploadId) + " " + shQuote(originalName);
@@ -385,12 +413,12 @@
     try {
       finishOut = await shExec(finishCmd);
     } catch (err) {
-      throw new Error("Failed to finalize the transfer: " + err.message);
+      throw new Error(t("finalizeFailed", { message: err.message }));
     }
 
     var finishResult = safeParseJson(finishOut);
     if (!finishResult) {
-      throw new Error("The install script returned an unreadable response:\n" + finishOut);
+      throw new Error(t("unreadableResponse", { response: finishOut }));
     }
     return finishResult;
   }
@@ -403,21 +431,72 @@
     }
   }
 
+  function localizeServerMessage(message) {
+    if (language !== "ru" || !message) return message;
+    var localized = messages.ru.serverMessages[message];
+    if (localized) return localized;
+
+    var match;
+    if ((match = /^Empty chunk \(index (\d+)\) was received\.$/.exec(message))) {
+      return t("serverEmptyChunk", { index: match[1] });
+    }
+    if ((match = /^Failed to write chunk (\d+) to staging\.$/.exec(message))) {
+      return t("serverStagingFailed", { index: match[1] });
+    }
+    if ((match = /^The \.([a-zA-Z0-9]+) extension is not supported\./.exec(message))) {
+      return t("serverUnsupportedExtension", { ext: match[1] });
+    }
+    if ((match = /^Staging file not found: (.+)$/.exec(message))) {
+      return t("serverFileNotFound", { path: match[1] });
+    }
+    if ((match = /^Failed to copy file to (.+)$/.exec(message))) {
+      return t("serverCopyFailed", { path: match[1] });
+    }
+    if (/^device\.conf not found\./.test(message)) return t("serverDeviceConfMissing");
+    if (/^No chunks were found for this upload/.test(message)) return t("serverNoChunks");
+    if (/^The assembled data is empty/.test(message)) return t("serverEmptyData");
+    if (/^Failed to decode the assembled file/.test(message)) return t("serverBase64Failed");
+    if (/^Decoding produced an empty file/.test(message)) return t("serverCorruptData");
+    return message;
+  }
+
+  function localizeResultMessage(result) {
+    if (language !== "ru") return result.message;
+    if (result.ok && result.stage === "done") {
+      var file = result.installed_as || "";
+      var success = t(result.via_overlay ? "installOverlaySuccess" : "installSuccess", { file: file });
+      var warning = "";
+      var match;
+      if (result.media_match_type === "existing_dir_fallback") {
+        match = /under (.+?) before this install/.exec(result.message);
+        if (match) warning = t("unconfirmedPathWarning", { path: match[1] });
+      } else if (result.media_match_type === "hardcoded_fallback") {
+        match = /so (.+?) is a hardcoded guess/.exec(result.message);
+        if (match) warning = t("guessedPathWarning", { path: match[1] });
+      }
+      return warning ? success + " " + warning : success;
+    }
+    if (result.stage === "remount_failed") return t("serverRemountFailed");
+    if (result.stage === "no_metamodule") return t("serverNoMetamodule");
+    return localizeServerMessage(result.message);
+  }
+
   function renderResult(result) {
+    var message = localizeResultMessage(result);
     if (result.ok) {
-      logLine("\u2713 " + result.message);
+      logLine("\u2713 " + message);
       if (result.reboot_required) {
-        logLine("Reboot your device to see the new boot animation.");
+        logLine(t("rebootToSee"));
       }
       showValidationError(null);
       els.applyBtn.classList.remove("is-danger");
     } else {
-      logLine("\u2717 [" + (result.stage || "error") + "] " + result.message);
-      showValidationError(result.message);
+      logLine("\u2717 [" + (result.stage || t("stageError")) + "] " + message);
+      showValidationError(message);
       els.applyBtn.classList.add("is-danger");
 
       if (result.stage === "no_metamodule" && Array.isArray(result.suggest_metamodules)) {
-        logLine("Suggested metamodules: " + result.suggest_metamodules.join(", "));
+        logLine(t("suggestedMetamodules", { names: result.suggest_metamodules.join(", ") }));
       }
       if (result.stage === "samsung_guard") {
         // The picked file is fundamentally the wrong format for this
@@ -434,11 +513,11 @@
     resetLog();
     els.applyBtn.disabled = true;
     var originalBtnText = els.applyBtnText.textContent;
-    els.applyBtnText.textContent = "Installing\u2026";
+    els.applyBtnText.textContent = t("installing");
     showValidationError(null);
 
     try {
-      logLine("Reading " + selectedFile.name + " (" + formatSize(selectedFile.size) + ")\u2026");
+      logLine(t("readingFile", { name: selectedFile.name, size: formatSize(selectedFile.size) }));
       var base64Data = await readFileAsBase64(selectedFile);
 
       var result = await chunkUpload(base64Data, selectedFile.name);
@@ -484,12 +563,13 @@
 
   async function init() {
     cacheEls();
+    applyTranslations();
     bindEvents();
     refreshApplyButton();
 
     if (!hasExecBridge()) {
-      els.deviceLine.textContent = "No root shell bridge detected \u2014 open this page from your root manager app.";
-      setApplyDisabledReason("Root bridge unavailable");
+      els.deviceLine.textContent = t("noRootBridge");
+      setApplyDisabledReason("rootBridgeUnavailable");
       return;
     }
 
@@ -497,7 +577,7 @@
       await loadDeviceStatus();
       await loadCurrentState();
     } catch (err) {
-      els.deviceLine.textContent = "Failed to read device status: " + err.message;
+      els.deviceLine.textContent = t("failedDeviceStatus", { message: err.message });
     }
   }
 
