@@ -7,60 +7,7 @@ STAGING="$DATADIR/staging"
 CONF="$DATADIR/device.conf"
 LOG="$DATADIR/apply.log"
 PROPFILE="$MODDIR/module.prop"
-MANAGER_LOCALE_READY=false
-
-load_manager_locale() {
-  _system_locale=$(getprop persist.sys.locale 2>/dev/null)
-  [ -n "$_system_locale" ] || _system_locale=$(getprop ro.product.locale 2>/dev/null)
-  [ -n "$_system_locale" ] || _system_locale=$(getprop persist.sys.language 2>/dev/null)
-  _system_locale=$(printf '%s' "$_system_locale" | cut -d',' -f1 | tr '[:upper:]' '[:lower:]')
-
-  case "$_system_locale" in
-    ru|ru-*|ru_*) MANAGER_LOCALE="ru" ;;
-    *) MANAGER_LOCALE="en" ;;
-  esac
-
-  _locale_file="$MODDIR/webroot/locales/manager-${MANAGER_LOCALE}.sh"
-  if [ ! -f "$_locale_file" ] && [ "$MANAGER_LOCALE" = "ru" ]; then
-    log "Russian manager locale not found; falling back to English."
-    MANAGER_LOCALE="en"
-    _locale_file="$MODDIR/webroot/locales/manager-en.sh"
-  fi
-  if [ ! -f "$_locale_file" ]; then
-    log "Manager locale file not found: $_locale_file"
-    MANAGER_LOCALE_READY=false
-    return 1
-  fi
-  # shellcheck disable=SC1090
-  . "$_locale_file" || {
-    log "Failed to load manager locale: $_locale_file"
-    MANAGER_LOCALE_READY=false
-    return 1
-  }
-  MANAGER_LOCALE_READY=true
-}
-
-update_module_desc() {
-  _ok="$1"
-  _detail="$2"
-  [ "$MANAGER_LOCALE_READY" = "true" ] || return 0
-  [ -f "$PROPFILE" ] || return 0
-
-  if [ "$_ok" = "true" ]; then
-    _status="[✅ ${MANAGER_STATUS_WORKING}] ${MANAGER_STATUS_PATH}: ${_detail}"
-  else
-    _status="[❌ ${MANAGER_STATUS_FAILED}: ${_detail}] ${MANAGER_DEFAULT_DESC}"
-  fi
-
-  # Escape characters that would otherwise break the sed replacement (sed
-  # delimiter, & backreference, and any literal backslash in the path).
-  _status_escaped=$(printf '%s' "$_status" | sed 's/[&/\]/\\&/g')
-
-  if sed "s|^description=.*|description=${_status_escaped}|" "$PROPFILE" > "$PROPFILE.tmp" 2>/dev/null; then
-    cat "$PROPFILE.tmp" > "$PROPFILE" 2>/dev/null
-  fi
-  rm -f "$PROPFILE.tmp" 2>/dev/null
-}
+. "$MODDIR/common/manager.sh"
 
 emit() {
   # emit ok stage message [extra_json_fields]
@@ -68,7 +15,7 @@ emit() {
   _msg_escaped=$(printf '%s' "$_msg" | sed 's/\\/\\\\/g; s/"/\\"/g' | tr '\n' ' ')
 
   if [ -n "$DESC_DETAIL" ]; then
-    update_module_desc "$_ok" "$DESC_DETAIL"
+    update_module_desc "$_ok" "$DESC_DETAIL" "$MODDIR"
   fi
 
   if [ -n "$_extra" ]; then
@@ -84,7 +31,7 @@ log() {
 }
 
 mkdir -p "$DATADIR" "$BACKUPDIR" "$STAGING" 2>/dev/null
-load_manager_locale
+load_manager_locale "$MODDIR"
 
 sanitize_id() {
   # Keep upload IDs to a safe filename character set so they can't be used
