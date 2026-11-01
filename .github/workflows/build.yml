@@ -19,6 +19,7 @@ jobs:
           sh -n customize.sh
           sh -n service.sh
           sh -n uninstall.sh
+          sh -n common/manager.sh
           sh -n common/apply.sh
           sh -n webroot/locales/manager-en.sh
           sh -n webroot/locales/manager-ru.sh
@@ -47,6 +48,7 @@ jobs:
           for file in \
             module.prop \
             customize.sh \
+            common/manager.sh \
             common/apply.sh \
             webroot/index.html \
             webroot/main.js \
