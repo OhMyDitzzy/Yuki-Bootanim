@@ -7,17 +7,49 @@ STAGING="$DATADIR/staging"
 CONF="$DATADIR/device.conf"
 LOG="$DATADIR/apply.log"
 PROPFILE="$MODDIR/module.prop"
-DEFAULT_DESC="Install custom boot animations (.zip / Samsung .qmg) via WebUI. Supports KernelSU, KernelSU Next, APatch, and Magisk. Automatically selects remount method (Android 9-) or overlay via metamodule (Android 10+)."
+MANAGER_LOCALE_READY=false
+
+load_manager_locale() {
+  _system_locale=$(getprop persist.sys.locale 2>/dev/null)
+  [ -n "$_system_locale" ] || _system_locale=$(getprop ro.product.locale 2>/dev/null)
+  [ -n "$_system_locale" ] || _system_locale=$(getprop persist.sys.language 2>/dev/null)
+  _system_locale=$(printf '%s' "$_system_locale" | cut -d',' -f1 | tr '[:upper:]' '[:lower:]')
+
+  case "$_system_locale" in
+    ru|ru-*|ru_*) MANAGER_LOCALE="ru" ;;
+    *) MANAGER_LOCALE="en" ;;
+  esac
+
+  _locale_file="$MODDIR/webroot/locales/manager-${MANAGER_LOCALE}.sh"
+  if [ ! -f "$_locale_file" ] && [ "$MANAGER_LOCALE" = "ru" ]; then
+    log "Russian manager locale not found; falling back to English."
+    MANAGER_LOCALE="en"
+    _locale_file="$MODDIR/webroot/locales/manager-en.sh"
+  fi
+  if [ ! -f "$_locale_file" ]; then
+    log "Manager locale file not found: $_locale_file"
+    MANAGER_LOCALE_READY=false
+    return 1
+  fi
+  # shellcheck disable=SC1090
+  . "$_locale_file" || {
+    log "Failed to load manager locale: $_locale_file"
+    MANAGER_LOCALE_READY=false
+    return 1
+  }
+  MANAGER_LOCALE_READY=true
+}
 
 update_module_desc() {
   _ok="$1"
   _detail="$2"
+  [ "$MANAGER_LOCALE_READY" = "true" ] || return 0
   [ -f "$PROPFILE" ] || return 0
 
   if [ "$_ok" = "true" ]; then
-    _status="[✅ Working] Path: ${_detail}"
+    _status="[✅ ${MANAGER_STATUS_WORKING}] ${MANAGER_STATUS_PATH}: ${_detail}"
   else
-    _status="[❌ Failed: ${_detail}] ${DEFAULT_DESC}"
+    _status="[❌ ${MANAGER_STATUS_FAILED}: ${_detail}] ${MANAGER_DEFAULT_DESC}"
   fi
 
   # Escape characters that would otherwise break the sed replacement (sed
@@ -52,6 +84,7 @@ log() {
 }
 
 mkdir -p "$DATADIR" "$BACKUPDIR" "$STAGING" 2>/dev/null
+load_manager_locale
 
 sanitize_id() {
   # Keep upload IDs to a safe filename character set so they can't be used
@@ -277,13 +310,13 @@ else
   log "Direct-write failed to $SYSTEM_MEDIA (API $API). Trying overlay module path as fallback."
   if [ "$API" -lt 29 ]; then
     # Android 9 shouldn't need an overlay at all; if even remounting RW fails here, it's likely that dm-verity hasn't been fully disabled in the root setup of this device.
-    DESC_DETAIL="dm-verity/AVB still active"
+    DESC_DETAIL="$MANAGER_DETAIL_VERITY"
     emit false "remount_failed" "Failed to remount /system to writable. It's possible that dm-verity is still enabled on this device even though it's rooted. Ensure the root process correctly disabled verity, then reboot and try again."
   fi
 
   # Android 10+ without direct-write works: use overlay path.
   if [ "$ROOT_MGR" = "ksu" ] && [ "$HAS_METAMODULE" != "true" ]; then
-    DESC_DETAIL="no metamodule installed"
+    DESC_DETAIL="$MANAGER_DETAIL_NO_METAMODULE"
     emit false "no_metamodule" "Direct remount to /system fails (likely dm-verity/AVB is still active) and KernelSU delegates the installation of the /system module to a third-party metamodule. — Nothing detected is installed. Install the metamodule first. Hybrid-Mount is recommended (more modern, supports KernelSU & APatch), or Mountify is an alternative, If you are using Magisk, You can try use Magisk OverlayFS module. Once installed and rebooted, try installing the boot animation again." "\"suggest_metamodules\":[\"Hybrid-Mount\",\"Mountify\"]"
   fi
 
@@ -331,7 +364,7 @@ if [ "$EXT" = "zip" ]; then
   backup_if_needed "$DEST"
   if ! cp -f "$SRC" "$DEST" 2>/dev/null; then
     [ "$REMOUNTED_BY_US" = "true" ] && mount -o ro,remount /system 2>/dev/null
-    DESC_DETAIL="copy to $DEST failed"
+    DESC_DETAIL="$MANAGER_DETAIL_COPY_FAILED: $DEST"
     emit false "commit" "Failed to copy file to $DEST"
   fi
   chmod 0644 "$DEST" 2>/dev/null
@@ -356,7 +389,7 @@ else
   backup_if_needed "$DEST"
   if ! cp -f "$SRC" "$DEST" 2>/dev/null; then
     [ "$REMOUNTED_BY_US" = "true" ] && mount -o ro,remount /system 2>/dev/null
-    DESC_DETAIL="copy to $DEST failed"
+    DESC_DETAIL="$MANAGER_DETAIL_COPY_FAILED: $DEST"
     emit false "commit" "Failed to copy file to $DEST"
   fi
   chmod 0644 "$DEST" 2>/dev/null
@@ -396,19 +429,19 @@ case "$MEDIA_MATCH_TYPE" in
   existing_dir_fallback)
     PATH_CONFIRMED=false
     MATCH_WARNING=" WARNING: no existing boot animation was found under ${DISPLAY_MEDIA_PATH} before this install, so this path is a guess, not a confirmed match. If the animation doesn't change after reboot, this ROM likely reads its boot animation from a path this module doesn't know about yet."
-    CONFIDENCE_TAG=", unconfirmed path"
+    CONFIDENCE_TAG="$MANAGER_CONFIDENCE_UNCONFIRMED"
     ;;
   *)
     PATH_CONFIRMED=false
     MATCH_WARNING=" WARNING: none of this module's known candidate paths exist yet on this device, so ${DISPLAY_MEDIA_PATH} is a hardcoded guess. If the animation doesn't change after reboot, this ROM likely stores its boot animation somewhere this module doesn't know about."
-    CONFIDENCE_TAG=", unconfirmed path"
+    CONFIDENCE_TAG="$MANAGER_CONFIDENCE_UNCONFIRMED"
     ;;
 esac
 
 if [ "$USE_OVERLAY" = "true" ]; then
-  DESC_DETAIL="${DISPLAY_MEDIA_PATH} (Overlay${CONFIDENCE_TAG})"
+  DESC_DETAIL="${DISPLAY_MEDIA_PATH} (${MANAGER_METHOD_OVERLAY}${CONFIDENCE_TAG})"
   emit true "done" "The file is stored as $(basename "$RESULT_PATH") via the overlay module path. This only becomes active after REBOOT — direct remounting to /system is not available on this device.${MATCH_WARNING}" "\"installed_as\":\"$(basename "$RESULT_PATH")\",\"reboot_required\":true,\"via_overlay\":true,\"media_match_type\":\"$MEDIA_MATCH_TYPE\",\"path_confirmed\":$PATH_CONFIRMED"
 else
-  DESC_DETAIL="${DISPLAY_MEDIA_PATH} (Direct-write${CONFIDENCE_TAG})"
+  DESC_DETAIL="${DISPLAY_MEDIA_PATH} (${MANAGER_METHOD_DIRECT_WRITE}${CONFIDENCE_TAG})"
   emit true "done" "Successfully installed as $(basename "$RESULT_PATH"). Reboot to see the new boot animation.${MATCH_WARNING}" "\"installed_as\":\"$(basename "$RESULT_PATH")\",\"reboot_required\":true,\"via_overlay\":false,\"media_match_type\":\"$MEDIA_MATCH_TYPE\",\"path_confirmed\":$PATH_CONFIRMED"
 fi
