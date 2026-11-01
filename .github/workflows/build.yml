@@ -1,0 +1,72 @@
+name: Build Module
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate module scripts
+        run: |
+          sh -n customize.sh
+          sh -n service.sh
+          sh -n uninstall.sh
+          sh -n common/apply.sh
+          sh -n webroot/locales/manager-en.sh
+          sh -n webroot/locales/manager-ru.sh
+          node --check webroot/main.js
+          node --check webroot/locales/en.js
+          node --check webroot/locales/ru.js
+
+      - name: Build module ZIP
+        run: |
+          VERSION=$(sed -n 's/^version=//p' module.prop | head -n 1)
+          if [ -z "$VERSION" ]; then
+            echo "::error::Could not read version from module.prop"
+            exit 1
+          fi
+
+          mkdir -p dist
+          ZIP_NAME="Yuki-Bootanim-${VERSION}.zip"
+          zip -r "dist/$ZIP_NAME" . \
+            -x ".git/*" \
+            -x ".github/*" \
+            -x ".gitignore" \
+            -x "dist/*" \
+            -x "*.zip"
+
+          unzip -t "dist/$ZIP_NAME"
+          for file in \
+            module.prop \
+            customize.sh \
+            common/apply.sh \
+            webroot/index.html \
+            webroot/main.js \
+            webroot/locales/en.js \
+            webroot/locales/ru.js \
+            webroot/locales/manager-en.sh \
+            webroot/locales/manager-ru.sh
+          do
+            unzip -Z1 "dist/$ZIP_NAME" | grep -Fx "$file" > /dev/null || {
+              echo "::error::Missing required file in ZIP: $file"
+              exit 1
+            }
+          done
+
+          echo "zip_name=$ZIP_NAME" >> "$GITHUB_ENV"
+
+      - name: Upload module ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: Yuki-Bootanim-module
+          path: dist/${{ env.zip_name }}
+          if-no-files-found: error
+          retention-days: 14
