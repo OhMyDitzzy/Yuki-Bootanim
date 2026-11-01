@@ -1,6 +1,6 @@
-# Yuki Boot Animation
+<p align="center"><a href="README.md">English</a> | <a href="README_RU.md">Русский</a></p>
 
-<p align="center"><a href="README_RU.md">Русская версия</a></p>
+# Yuki Boot Animation
 
 A Magisk / KernelSU / KernelSU Next / APatch module that lets you install a
 custom boot animation straight from its WebUI — no manual `adb push`, no
