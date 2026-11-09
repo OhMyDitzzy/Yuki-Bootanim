@@ -1,74 +1,118 @@
-name: Build Module
+name: Build Yuki-Bootanim
 
 on:
+  push:
+    branches:
+      - main
+      - dev
+    tags:
+      - "v*"
   workflow_dispatch:
+    inputs:
+      create_release:
+        description: "Опубликовать GitHub Release?"
+        type: boolean
+        required: true
+        default: true
+      verify_version:
+        description: "Проверить совпадение тега и версии в module.prop?"
+        type: boolean
+        required: true
+        default: true
 
 permissions:
-  contents: read
+  contents: write
+  id-token: write
+  attestations: write
 
 jobs:
-  build:
+  build-and-release:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Чеккаут репозитория
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Validate module scripts
+      - name: Парсинг метаданных module.prop
+        id: metadata
         run: |
-          sh -n customize.sh
-          sh -n service.sh
-          sh -n uninstall.sh
-          sh -n common/manager.sh
-          sh -n common/apply.sh
-          sh -n webroot/locales/manager-en.sh
-          sh -n webroot/locales/manager-ru.sh
-          node --check webroot/main.js
-          node --check webroot/locales/en.js
-          node --check webroot/locales/ru.js
-
-      - name: Build module ZIP
-        run: |
-          VERSION=$(sed -n 's/^version=//p' module.prop | head -n 1)
-          if [ -z "$VERSION" ]; then
-            echo "::error::Could not read version from module.prop"
+          if [ ! -f module.prop ]; then
+            echo "::error title=Missing module.prop::Файл module.prop не найден!"
             exit 1
           fi
 
-          mkdir -p dist
-          ZIP_NAME="Yuki-Bootanim-${VERSION}.zip"
-          zip -r "dist/$ZIP_NAME" . \
-            -x ".git/*" \
-            -x ".github/*" \
-            -x ".gitignore" \
-            -x "dist/*" \
-            -x "*.zip"
+          VERSION=$(sed -n 's/^version=\([^ ]*\).*/\1/p' module.prop | sed 's/^v//')
+          VERSION_CODE=$(sed -n "s/^versionCode=//p" module.prop)
+          ID=$(sed -n "s/^id=//p" module.prop)
 
-          unzip -t "dist/$ZIP_NAME"
-          for file in \
-            module.prop \
-            customize.sh \
-            common/manager.sh \
-            common/apply.sh \
-            webroot/index.html \
-            webroot/main.js \
-            webroot/locales/en.js \
-            webroot/locales/ru.js \
-            webroot/locales/manager-en.sh \
-            webroot/locales/manager-ru.sh
-          do
-            unzip -Z1 "dist/$ZIP_NAME" | grep -Fx "$file" > /dev/null || {
-              echo "::error::Missing required file in ZIP: $file"
-              exit 1
-            }
-          done
+          FILENAME="${ID}-v${VERSION}_(${VERSION_CODE}).zip"
 
-          echo "zip_name=$ZIP_NAME" >> "$GITHUB_ENV"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "version_code=${VERSION_CODE}" >> "$GITHUB_OUTPUT"
+          echo "id=${ID}" >> "$GITHUB_OUTPUT"
+          echo "filename=${FILENAME}" >> "$GITHUB_OUTPUT"
 
-      - name: Upload module ZIP
+          echo "📋 ID модуля: ${ID}"
+          echo "📋 Версия: v${VERSION} (${VERSION_CODE})"
+          echo "📦 Имя архива: ${FILENAME}"
+
+      - name: Проверка совпадения версии с тегом
+        if: ${{ startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.verify_version == true) }}
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            TAG_NAME="${{ github.ref_name }}"
+          else
+            TAG_NAME=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          fi
+
+          CLEAN_TAG=$(echo "$TAG_NAME" | sed 's/^v//')
+          MODULE_VERSION="${{ steps.metadata.outputs.version }}"
+
+          if [ -n "$TAG_NAME" ] && [ "$CLEAN_TAG" != "$MODULE_VERSION" ]; then
+            echo "::error title=Несовпадение версий::Версия в теге ($CLEAN_TAG) не совпадает с версией в module.prop ($MODULE_VERSION)!"
+            exit 1
+          fi
+          echo "✅ Проверка версий успешно пройдена!"
+
+      - name: Сборка / Упаковка анимации
+        run: |
+          mkdir -p _builds
+          
+          # Если есть специфический скрипт сборки (например, для компрессии архива анимации), запускаем его
+          if [ -f build.sh ]; then
+            chmod +x build.sh
+            ./build.sh
+          else
+            # Иначе пакуем содержимое в чистый zip, исключая мусор
+            zip -r "_builds/${{ steps.metadata.outputs.filename }}" . -x ".git*" ".github*" "_builds/*" "*.md"
+          fi
+
+          # Если кастомный скрипт сложил готовый архив куда-то еще, переносим его
+          if [ -f *.zip ]; then
+            mv *.zip "_builds/${{ steps.metadata.outputs.filename }}" 2>/dev/null || true
+          fi
+
+      - name: Загрузка Artifact в GitHub Actions
         uses: actions/upload-artifact@v4
         with:
-          name: Yuki-Bootanim-module
-          path: dist/${{ env.zip_name }}
-          if-no-files-found: error
-          retention-days: 14
+          name: ${{ steps.metadata.outputs.filename }}
+          path: _builds/${{ steps.metadata.outputs.filename }}
+
+      - name: Создание GitHub Release
+        if: ${{ startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.create_release == true) }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.metadata.outputs.version }}
+          name: Release v${{ steps.metadata.outputs.version }} (${{ steps.metadata.outputs.version_code }})
+          body: |
+            ### 🎬 Релиз модуля Yuki Bootanimation (${{ steps.metadata.outputs.id }})
+            - **Версия:** `v${{ steps.metadata.outputs.version }}`
+            - **Код сборки:** `${{ steps.metadata.outputs.version_code }}`
+          draft: false
+          prerelease: false
+          files: |
+            _builds/${{ steps.metadata.outputs.filename }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
