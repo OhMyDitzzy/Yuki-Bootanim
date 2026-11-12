@@ -1,3 +1,5 @@
+<p align="center"><a href="README.md">English</a> | <a href="README_RU.md">Русский</a></p>
+
 # Yuki Boot Animation
 
 A Magisk / KernelSU / KernelSU Next / APatch module that lets you install a
@@ -15,6 +17,12 @@ device, and applying it.
 ## Features
 
 - **WebUI-based install** — no terminal required after the initial setup.
+- **Automatic language detection** — the WebUI follows the device language,
+  with Russian and English translations (English is used for other languages).
+  Translation dictionaries live in `webroot/locales/` and load locally before
+  the WebUI script. The installer output and module manager description are
+  also localized during module installation and updated with the install
+  status afterward.
 - **Two boot animation formats** — standard `bootanimation.zip` for most
   devices, and Samsung's `.qmg` format (`bootsamsung.qmg` /
   `bootsamsungloop.qmg`) for One UI devices. The module detects which one
