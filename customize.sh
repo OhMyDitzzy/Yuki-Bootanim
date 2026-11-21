@@ -4,28 +4,55 @@ SKIPUNZIP=0
 
 DATADIR="/data/adb/yuki_bootanim_installer"
 CONF="$DATADIR/device.conf"
+MANAGER_LOCALE_READY=false
+
+if [ -f "$MODPATH/common/manager.sh" ]; then
+  # shellcheck disable=SC1090
+  . "$MODPATH/common/manager.sh"
+  load_manager_locale "$MODPATH"
+fi
+
+if [ "$MANAGER_LOCALE_READY" != "true" ]; then
+  INSTALL_TITLE="Yuki BootAnimation Installer"
+  INSTALL_KSU_DETECTED="Detected KernelSU / KernelSU Next"
+  INSTALL_APATCH_DETECTED="APatch detected"
+  INSTALL_MAGISK_DETECTED="Magisk detected"
+  INSTALL_MAGISK_UNSUPPORTED="This module requires Magisk v20.4 or above"
+  INSTALL_ROOT_UNKNOWN="[!] Root manager not recognized. Proceeding assuming compatibility; use with caution."
+  INSTALL_API_FALLBACK="[!] Failed to read API level; using fallback"
+  INSTALL_API_LEVEL="Android API level:"
+  INSTALL_SAMSUNG_DETECTED="Samsung device detected -> boot animation mode .qmg"
+  INSTALL_STANDARD_DETECTED="Non-Samsung device -> standard .zip boot animation mode"
+  INSTALL_METAMODULE="Metamodule installed:"
+  INSTALL_METAMODULE_NAME_UNKNOWN="unknown name"
+  INSTALL_DESCRIPTION_UPDATE_FAILED="[!] Could not update the module manager description."
+  INSTALL_LOCALE_LOAD_FAILED="[!] Could not load the module manager language; keeping the default description."
+  INSTALL_LOCALE_HELPER_MISSING="[!] Module manager localization helper is missing."
+  INSTALL_SETUP_COMPLETE="Setup is complete. Reboot, then open this module from"
+  INSTALL_SETUP_WEBUI="manager to select a boot animation via WebUI."
+fi
 
 ui_print " "
 ui_print "======================================"
-ui_print "   Yuki BootAnimation Installer"
+ui_print "   $INSTALL_TITLE"
 ui_print "======================================"
 ui_print " "
 
 if [ "$KSU" = "true" ]; then
   ROOT_MGR="ksu"
-  ui_print "- Detected KernelSU / KernelSU Next $KSU_VER"
+  ui_print "- $INSTALL_KSU_DETECTED $KSU_VER"
 elif [ "$APATCH" = "true" ]; then
   ROOT_MGR="apatch"
-  ui_print "- APatch Detected $APATCH_VER"
+  ui_print "- $INSTALL_APATCH_DETECTED $APATCH_VER"
 elif [ -n "$MAGISK_VER_CODE" ]; then
   ROOT_MGR="magisk"
-  ui_print "- Magisk Detected $MAGISK_VER"
+  ui_print "- $INSTALL_MAGISK_DETECTED $MAGISK_VER"
   if [ "$MAGISK_VER_CODE" -lt 20400 ]; then
-    abort "! This module requires Magisk v20.4 or above"
+    abort "! $INSTALL_MAGISK_UNSUPPORTED"
   fi
 else
   ROOT_MGR="unknown"
-  ui_print "- [!] Root manager not recognized!!! proceeding assuming compatible, Use with caution!"
+  ui_print "- $INSTALL_ROOT_UNKNOWN"
 fi
 
 # Note: we are NOT distinguishing the official "ksu" from KernelSU Next/SukiSU-Ultra
@@ -39,9 +66,9 @@ if [ -z "$DEV_API" ]; then
 fi
 if [ -z "$DEV_API" ]; then
   DEV_API=21
-  ui_print "- [!] Warning: failed to read API level, fallback to $DEV_API"
+  ui_print "- $INSTALL_API_FALLBACK $DEV_API"
 else
-  ui_print "- Android API level: $DEV_API"
+  ui_print "- $INSTALL_API_LEVEL $DEV_API"
 fi
 
 MANUFACTURER=$(getprop ro.product.manufacturer 2>/dev/null | tr '[:upper:]' '[:lower:]')
@@ -53,9 +80,9 @@ case "$MANUFACTURER $BRAND" in
 esac
 
 if [ "$IS_SAMSUNG" = "true" ]; then
-  ui_print "- Samsung device detected -> boot animation mode .qmg"
+  ui_print "- $INSTALL_SAMSUNG_DETECTED"
 else
-  ui_print "- Non-Samsung devices -> standard .zip boot animation mode"
+  ui_print "- $INSTALL_STANDARD_DETECTED"
 fi
 
 HAS_METAMODULE=false
@@ -63,7 +90,7 @@ METAMODULE_NAME=""
 if [ -e "/data/adb/metamodule" ]; then
   HAS_METAMODULE=true
   METAMODULE_NAME=$(basename "$(readlink -f /data/adb/metamodule 2>/dev/null)" 2>/dev/null)
-  ui_print "- Metamodule installed: ${METAMODULE_NAME:-tidak diketahui namanya}"
+  ui_print "- $INSTALL_METAMODULE ${METAMODULE_NAME:-$INSTALL_METAMODULE_NAME_UNKNOWN}"
 fi
 
 mkdir -p "$DATADIR/backup" "$DATADIR/staging" 2>/dev/null
@@ -94,7 +121,19 @@ if [ -f "$MODPATH/common/apply.sh" ]; then
   chmod 0755 "$MODPATH/apply.sh"
 fi
 
+if [ -f "$MODPATH/common/manager.sh" ]; then
+  if [ "$MANAGER_LOCALE_READY" = "true" ]; then
+    if ! update_module_desc true "$MANAGER_DETAIL_READY" "$MODPATH"; then
+      ui_print "- $INSTALL_DESCRIPTION_UPDATE_FAILED"
+    fi
+  else
+    ui_print "- $INSTALL_LOCALE_LOAD_FAILED"
+  fi
+else
+  ui_print "- $INSTALL_LOCALE_HELPER_MISSING"
+fi
+
 ui_print " "
-ui_print "- Setup is complete. Reboot, then open this module from"
-ui_print "  manager to select boot animation via WebUI."
+ui_print "- $INSTALL_SETUP_COMPLETE"
+ui_print "  $INSTALL_SETUP_WEBUI"
 ui_print " "

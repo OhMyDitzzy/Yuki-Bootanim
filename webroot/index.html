@@ -12,38 +12,38 @@
 
   <section class="hero" id="heroCard">
     <div class="hero-content">
-      <span class="hero-eyebrow">Boot Animation Installer</span>
+      <span class="hero-eyebrow" data-i18n="eyebrow">Boot Animation Installer</span>
       <span class="hero-version" id="heroVersion">v1.0.0</span>
     </div>
     <p class="hero-name">Yuki BootAnim</p>
-    <p class="hero-sub" id="deviceLine">Reading device info&hellip;</p>
+    <p class="hero-sub" id="deviceLine" data-i18n="readingDevice">Reading device info&hellip;</p>
   </section>
 
-  <section class="stat-grid" id="deviceStatusPanel" aria-label="Device status">
+  <section class="stat-grid" id="deviceStatusPanel" aria-label="Device status" data-i18n-aria-label="deviceStatus">
     <div class="stat-card">
       <span class="stat-value" id="kvManager">&mdash;</span>
-      <span class="stat-label">Root manager</span>
+      <span class="stat-label" data-i18n="rootManager">Root manager</span>
     </div>
     <div class="stat-card">
       <span class="stat-value" id="kvApi">&mdash;</span>
-      <span class="stat-label">Android API</span>
+      <span class="stat-label" data-i18n="androidApi">Android API</span>
     </div>
   </section>
 
   <section class="card" id="deviceDetailPanel">
-    <div class="card-title">Device details</div>
+    <div class="card-title" data-i18n="deviceDetails">Device details</div>
     <dl class="kv" id="deviceKV">
-      <div class="kv-row"><dt>Format boot anim</dt><dd id="kvFormat">&mdash;</dd></div>
-      <div class="kv-row"><dt>Installation path</dt><dd id="kvMount">&mdash;</dd></div>
+      <div class="kv-row"><dt data-i18n="bootAnimationFormat">Format boot anim</dt><dd id="kvFormat">&mdash;</dd></div>
+      <div class="kv-row"><dt data-i18n="installationPath">Installation path</dt><dd id="kvMount">&mdash;</dd></div>
     </dl>
     <div class="notice notice-warn" id="metamoduleWarning" hidden>
-      <strong>Metamodule has not been detected.</strong>
+      <strong data-i18n="metamoduleNotDetected">Metamodule has not been detected.</strong>
       <span id="metamoduleWarningText"></span>
     </div>
   </section>
 
   <section class="card" id="currentPanel" hidden>
-    <div class="card-title">Installed now</div>
+    <div class="card-title" data-i18n="installedNow">Installed now</div>
     <div class="current-file">
       <span class="mono" id="currentFileName">&mdash;</span>
       <span class="current-time" id="currentFileTime"></span>
@@ -51,7 +51,7 @@
   </section>
 
   <section class="card">
-    <div class="card-title">Install new boot animation</div>
+    <div class="card-title" data-i18n="installNewAnimation">Install new boot animation</div>
 
     <label class="picker" id="pickerLabel" for="fileInput">
       <input type="file" id="fileInput" accept=".zip,.qmg" hidden />
@@ -61,25 +61,25 @@
           <path d="M4 16 L4 18 C4 19.1 4.9 20 6 20 L18 20 C19.1 20 20 19.1 20 18 L20 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </span>
-      <span class="picker-text" id="pickerText">Tap to select .zip / .qmg file</span>
-      <span class="picker-hint" id="pickerHint">Free file name &mdash; will be changed automatically</span>
+      <span class="picker-text" id="pickerText" data-i18n="selectFile">Tap to select .zip / .qmg file</span>
+      <span class="picker-hint" id="pickerHint" data-i18n="filenameHint">Free file name &mdash; will be changed automatically</span>
     </label>
 
     <div class="filebar" id="fileBar" hidden>
       <span class="mono filebar-name" id="fileBarName"></span>
       <span class="filebar-size" id="fileBarSize"></span>
-      <button class="filebar-clear" id="fileBarClear" type="button" aria-label="Cancel selection">&times;</button>
+      <button class="filebar-clear" id="fileBarClear" type="button" aria-label="Cancel selection" data-i18n-aria-label="cancelSelection">&times;</button>
     </div>
 
     <div class="notice notice-error" id="validationError" hidden></div>
 
     <button class="apply-btn" id="applyBtn" type="button" disabled>
-      <span id="applyBtnText">Select the file first</span>
+      <span id="applyBtnText" data-i18n="selectFileFirst">Select the file first</span>
     </button>
   </section>
 
   <section class="card" id="logPanel" hidden>
-    <div class="card-title">Process</div>
+    <div class="card-title" data-i18n="process">Process</div>
     <pre class="log mono" id="logOutput"></pre>
   </section>
 
@@ -91,6 +91,8 @@
 
 </main>
 
+<script src="locales/en.js"></script>
+<script src="locales/ru.js"></script>
 <script src="main.js"></script>
 </body>
 </html>
